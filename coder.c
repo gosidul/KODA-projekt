@@ -26,6 +26,12 @@ typedef struct cacheEntry {
     node* nodesAddress;
 } cacheEntry;
 
+typedef struct symbol {
+    uint32_t bits;
+    uint32_t mask;
+} symbol;
+
+symbol* symbols = NULL;
 uint16_t* records = NULL;
 cacheEntry* symbolCache = NULL;
 node** nodes = NULL;
@@ -285,12 +291,32 @@ uint16_t readFromStream() {
 }
 
 /**
-  * @brief Function creates bit representation for each symbol present in symbolCache
+  * @brief Function creates bit representation for each symbol present in symbolCache. Representation
+  * is saved in array of struct "symbols" when each struct consist of bit representation "bits" and
+  * number of bits saved -> "mask" because representation can have leading zeros.
   * @param None
-  * @retval 
+  * @retval None
   */
 void resolveTree() {
-    //TODO
+    
+    symbols = (symbol*)malloc(lastSymbolInCache * sizeof(symbol));
+
+    for (int i = 0; i < lastSymbolInCache; i++) {
+        node* root = nodes[0];
+        node* node = symbolCache[i].nodesAddress;
+
+        symbols[i].bits = 0;
+        symbols[i].mask = 0;
+
+        while (node != root) {
+            if (node->parent == (node->parent)->link1)
+                symbols[i].bits = (symbols[i].bits << 1) + 1;
+            else
+                symbols[i].bits = (symbols[i].bits << 1);
+        symbols[i].mask = (symbols[i].mask << 1) + 1;
+        node = node->parent;
+        }
+    }
 }
 
 /**
