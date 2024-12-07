@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <cstring>
 
 #define IMAGE_ROW_WIDTH 512
 #define SYMBOL_LINK 0xFFFF
@@ -36,8 +38,19 @@ int8_t* records = NULL;
 cacheEntry* symbolCache = NULL;
 node** nodes = NULL;
 
-FILE *fileToComprerss = NULL;
+FILE *fileToCompress = NULL;
 FILE *compressedFile = NULL;
+
+void manageMemory(uint16_t mode);
+int openFile();
+int readDataFromFile();
+void constructTree();
+void resolveTree();
+void saveCompressedFile();
+node* searchCache(uint16_t symbol);
+node* addNewSymbol(uint16_t newSymbolValue);
+node* incrementNode (node* incrementedNode);
+void memoryCheck();
 
 int main()
 {
@@ -50,23 +63,24 @@ int main()
     constructTree();
     resolveTree();
     saveCompressedFile();
-    if (fileToComprerss) 
-        fclose(fileToComprerss);
+    if (fileToCompress) 
+        fclose(fileToCompress);
     if (compressedFile) 
-        fclose(fileToComprerss);
+        fclose(fileToCompress);
     return 1;
 }
 
-void constructTree() 
+void constructTree()
 {
     uint16_t recordCount = 0;
     int8_t record = records[recordCount];
     node* root = nodes[0];
     while (recordCount < BASE_SYMBOL_BUFFER) {      // Function reads symbol values until EOF is reached
+        memoryCheck();
         node* symbol = NULL;
         symbol = searchCache(record);
         if (symbol == NULL){
-            addNewSymbol(record);
+            symbol = addNewSymbol(record);
         } 
         root->count++;
         while (symbol != root) {
@@ -100,7 +114,7 @@ node* searchCache(uint16_t symbol)
   * @param Node Address of node that we will increment
   * @retval address of "parent" node of newly created node, to further tree reorganization
   */
-node* incrementNode (node* incrementedNode) 
+node* incrementNode (node* incrementedNode)
 {
     // Increment count of node
     incrementedNode->count++;
@@ -138,7 +152,7 @@ node* incrementNode (node* incrementedNode)
   * @param newSymbolValue new symbol registered in data stream not present in SymbolCache
   * @retval address of "parent" node of newly created node, to further tree reorganization
   */
-node* addNewSymbol(uint16_t newSymbolValue) 
+node* addNewSymbol(uint16_t newSymbolValue)
 {
 // Search for the highest symbol in tree structure with the lowest "count" value 
 uint16_t tempAddress = lastNode;
@@ -157,8 +171,8 @@ symbolCache[lastSymbolInCache].value = newSymbolValue;
 // Populate struct fields for new symbol
 newSymbolNode->count = 1;
 newSymbolNode->parent = newParentNode;
-newSymbolNode->link0 = SYMBOL_LINK;
-newSymbolNode->link1 = SYMBOL_LINK; 
+newSymbolNode->link0 = (node*)SYMBOL_LINK;
+newSymbolNode->link1 = (node*)SYMBOL_LINK; 
 
 // Create new node in "nodes" array that will have reallocated and new symbol set 
 // as its children, and "count" as sum of children "count" values, swap parents of 2 nodes
@@ -178,7 +192,8 @@ return newParentNode->parent;
   * @param None
   * @retval None
   */
-void memoryCheck() {
+void memoryCheck()
+{
     if ((lastSymbolInCache + 1) >= BASE_CACHE_ENTRIES * cacheMemoryBlockMultiplier) 
         manageMemory(1);
     if ((lastNode + 2) >= BASE_NODE_ENTRIES * nodesMemoryBlockMultiplier) 
@@ -194,86 +209,86 @@ void manageMemory(uint16_t mode)
 {
     switch (mode) {
     // Initialization    
-    case 0:
-        records = (int8_t*)malloc(BASE_SYMBOL_BUFFER * sizeof(int8_t));
-        nodes = (node**)malloc(BASE_NODE_ENTRIES * sizeof(node*));
-        node* nodesMemoryBlock = (node*)malloc(BASE_NODE_ENTRIES * sizeof(node));
-        for (int i = 0; i < BASE_NODE_ENTRIES; i++)
-            nodes[i] = &nodesMemoryBlock[i];
-        symbolCache = (cacheEntry*)malloc(BASE_CACHE_ENTRIES * sizeof(cacheEntry));
+        case 0: {
+            records = (int8_t*)malloc(BASE_SYMBOL_BUFFER * sizeof(int8_t));
+            nodes = (node**)malloc(BASE_NODE_ENTRIES * sizeof(node*));
+            node* nodesMemoryBlock = (node*)malloc(BASE_NODE_ENTRIES * sizeof(node));
+            for (int i = 0; i < BASE_NODE_ENTRIES; i++)
+                nodes[i] = &nodesMemoryBlock[i];
+            symbolCache = (cacheEntry*)malloc(BASE_CACHE_ENTRIES * sizeof(cacheEntry));
 
-        node* root = nodes[0];
-        node* symbol1 = nodes[1];
-        node* symbol2 = nodes[2];
-        cacheEntry* cache0 = &symbolCache[0];
-        cacheEntry* cache1 = &symbolCache[1];
+            node* root = nodes[0];
+            node* symbol1 = nodes[1];
+            node* symbol2 = nodes[2];
+            cacheEntry* cache0 = &symbolCache[0];
+            cacheEntry* cache1 = &symbolCache[1];
 
-        root->count = 2;
-        root->parent = root;   // Root
-        root->link0 = symbol1;
-        root->link1 = symbol2;
+            root->count = 2;
+            root->parent = root;   // Root
+            root->link0 = symbol1;
+            root->link1 = symbol2;
 
-        symbol1->count = 1;
-        symbol1->parent = root;
-        symbol1->link0 = SYMBOL_LINK;    // Symbol
-        symbol1->link1 = SYMBOL_LINK;
+            symbol1->count = 1;
+            symbol1->parent = root;
+            symbol1->link0 = (node*)SYMBOL_LINK;    // Symbol
+            symbol1->link1 = (node*)SYMBOL_LINK;
 
-        symbol2->count = 1;
-        symbol2->parent = root;
-        symbol2->link0 = SYMBOL_LINK;    // Symbol
-        symbol2->link1 = SYMBOL_LINK;
+            symbol2->count = 1;
+            symbol2->parent = root;
+            symbol2->link0 = (node*)SYMBOL_LINK;    // Symbol
+            symbol2->link1 = (node*)SYMBOL_LINK;
 
-        cache0->nodesAddress = symbol1;
-        cache0->value = 0;
+            cache0->nodesAddress = symbol1;
+            cache0->value = 0;
 
-        cache1->nodesAddress = symbol2;
-        cache1->value = 1;
+            cache1->nodesAddress = symbol2;
+            cache1->value = 1;
 
-        lastSymbolInCache = 1;
-        lastNode = 2;
-        recordsCount = 0;
-        break;
+            lastSymbolInCache = 1;
+            lastNode = 2;
+            recordsCount = 0;
+            break;
+        }
+        // Realloc for symbolCache
+        case 1: {
+            uint16_t oldSizeOfCashe = BASE_CACHE_ENTRIES * cacheMemoryBlockMultiplier * sizeof(cacheEntry);
+            cacheMemoryBlockMultiplier++;
+            cacheEntry* tempCache = (cacheEntry*)malloc(BASE_CACHE_ENTRIES * cacheMemoryBlockMultiplier * sizeof(cacheEntry));
+            memcpy(tempCache, symbolCache, oldSizeOfCashe);
+            free(symbolCache);
+            symbolCache = tempCache;
+            break;
+        }
+        // Realloc for nodes array
+        case 2: {
+            uint16_t numberOfNodes = BASE_NODE_ENTRIES * nodesMemoryBlockMultiplier;
+            uint16_t oldSizeOfNodes = numberOfNodes * sizeof(node*);
+        
+            // Increment multiplier for the expanded node array
+            nodesMemoryBlockMultiplier++;
 
-    // Realloc for symbolCache
-    case 1: 
-        uint16_t oldSizeOfCashe = BASE_CACHE_ENTRIES * cacheMemoryBlockMultiplier * sizeof(cacheEntry);
-        cacheMemoryBlockMultiplier++;
-        cacheEntry* tempCache = (cacheEntry*)malloc(BASE_CACHE_ENTRIES * cacheMemoryBlockMultiplier * sizeof(cacheEntry));
-        memcpy(tempCache, symbolCache, oldSizeOfCashe);
-        free(symbolCache);
-        symbolCache = tempCache;
-        break;
+            // Allocate new memory blocks
+            node** tempNodes = (node**)malloc(BASE_NODE_ENTRIES * nodesMemoryBlockMultiplier * sizeof(node*));
+            node* newNodesMemoryBlock = (node*)malloc(BASE_NODE_ENTRIES * sizeof(node));
 
-    // Realloc for nodes array
-    case 2:
-        uint16_t numberOfNodes = BASE_NODE_ENTRIES * nodesMemoryBlockMultiplier;
-        uint16_t oldSizeOfNodes = numberOfNodes * sizeof(node*);
-    
-        // Increment multiplier for the expanded node array
-        nodesMemoryBlockMultiplier++;
+            // Copy old pointers into the new array and initialize pointers for new nodes
+            memcpy(tempNodes, nodes, oldSizeOfNodes);
+            for (int i = numberOfNodes; i < BASE_NODE_ENTRIES * nodesMemoryBlockMultiplier; i++)
+                tempNodes[i] = &newNodesMemoryBlock[i - numberOfNodes];
 
-        // Allocate new memory blocks
-        node** tempNodes = (node**)malloc(BASE_NODE_ENTRIES * nodesMemoryBlockMultiplier * sizeof(node*));
-        node* newNodesMemoryBlock = (node*)malloc(BASE_NODE_ENTRIES * sizeof(node));
-
-        // Copy old pointers into the new array and initialize pointers for new nodes
-        memcpy(tempNodes, nodes, oldSizeOfNodes);
-        for (int i = numberOfNodes; i < BASE_NODE_ENTRIES * nodesMemoryBlockMultiplier; i++)
-            tempNodes[i] = &newNodesMemoryBlock[i - numberOfNodes];
-
-        // Free old array and assign new memory
-        free(nodes);
-        nodes = tempNodes;
-        break;
-
-    // Free all data
-    case 3:
-        for (int i = 0; i < BASE_NODE_ENTRIES * nodesMemoryBlockMultiplier; i++) 
-            free(nodes[i]);
-        free(nodes);
-        free(symbolCache);
-        free(records);
-        default:
+            // Free old array and assign new memory
+            free(nodes);
+            nodes = tempNodes;
+            break;
+        }
+        // Free all data
+        case 3: {
+            free(nodes[0]);
+            free(nodes);
+            free(symbolCache);
+            free(records);
+            break;
+        }
     }
 }
 
@@ -290,8 +305,8 @@ int openFile()
         printf("\nError reading input.");
         return 1;
     }
-    fileToComprerss = fopen(filePath,"rb");
-    if (fileToComprerss == NULL) {
+    fileToCompress = fopen(filePath,"rb");
+    if (fileToCompress == NULL) {
         printf("\nError opening file");
         return 1;
     }
@@ -309,7 +324,7 @@ void skipHeader()
     uint16_t headerLines = 3;   // Each PGM Image File must consist of 3 header lines:
                                 // signature, rows and cols, max grey level
     while (headerLines > 0) {
-        fgets(line, sizeof(line), fileToComprerss); // Read header line
+        fgets(line, sizeof(line), fileToCompress); // Read header line
         if (line[0] == '#') continue;    // Skip all comments
         headerLines--;    
     }
@@ -326,17 +341,17 @@ int readDataFromFile()
     skipHeader();
 
     // Read all data from file and store it in records array
-    for (int i = 0; i < IMAGE_ROW_WIDTH; i++) {
-        size_t bytesRead = fread(&records[i * IMAGE_ROW_WIDTH], 1, IMAGE_ROW_WIDTH, fileToComprerss);
-        if (bytesRead != IMAGE_ROW_WIDTH && !feof(fileToComprerss)) {
+    for (int i = 0; i <= IMAGE_ROW_WIDTH; i++) {
+        size_t bytesRead = fread(&records[i * IMAGE_ROW_WIDTH], 1, IMAGE_ROW_WIDTH, fileToCompress);
+        if (bytesRead != IMAGE_ROW_WIDTH && !feof(fileToCompress)) {
             printf("Error reading data from file\n");
             free(records);
-            fclose(fileToComprerss);
+            fclose(fileToCompress);
             return 1;
         }
     }
     // Check if we reached end of file
-    if (feof(fileToComprerss))
+    if (feof(fileToCompress))
         return 0;
     printf("EOF not reached!\n");
     return 1;
@@ -376,6 +391,7 @@ void resolveTree()
   * @param None
   * @retval 
   */
-void saveCompressedFile() {
+void saveCompressedFile()
+{
     //TODO
 }
