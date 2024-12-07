@@ -1,14 +1,14 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#define IMAGE_ROW_WIDTH 512
 #define SYMBOL_LINK 0xFFFF
-#define BASE_SYMBOL_BUFFER  256
+#define BASE_SYMBOL_BUFFER  262144
 #define BASE_NODE_ENTRIES   128
 #define BASE_CACHE_ENTRIES  64
 
 uint8_t cacheMemoryBlockMultiplier   = 1;
 uint8_t nodesMemoryBlockMultiplier   = 1;
-uint8_t recordsMemoryBlockMultiplier = 1;
 
 uint16_t lastSymbolInCache;
 uint16_t lastNode;
@@ -32,26 +32,38 @@ typedef struct symbol {
 } symbol;
 
 symbol* symbols = NULL;
-uint16_t* records = NULL;
+int8_t* records = NULL;
 cacheEntry* symbolCache = NULL;
 node** nodes = NULL;
+
+FILE *fileToComprerss = NULL;
+FILE *compressedFile = NULL;
 
 int main()
 {
     manageMemory(0);
+    printf("Memory initialized");
+    if (openFile())
+        return 0;
+    if (readDataFromFile())
+        return 0;
     constructTree();
     resolveTree();
     saveCompressedFile();
+    if (fileToComprerss) 
+        fclose(fileToComprerss);
+    if (compressedFile) 
+        fclose(fileToComprerss);
+    return 1;
 }
 
 void constructTree() 
 {
-    uint16_t record = -1;
-    while (record == -1) 
-        record = readFromStream(); // Functon reads header
-    while (record != 0xFFFF) {
+    uint16_t recordCount = 0;
+    int8_t record = records[recordCount];
+    node* root = nodes[0];
+    while (recordCount < BASE_SYMBOL_BUFFER) {      // Function reads symbol values until EOF is reached
         node* symbol = NULL;
-        node* root = nodes[0];
         symbol = searchCache(record);
         if (symbol == NULL){
             addNewSymbol(record);
@@ -60,7 +72,7 @@ void constructTree()
         while (symbol != root) {
             symbol = incrementNode(symbol);
         }
-        record = readFromStream();
+        record = records[++recordCount];
     }
 }
 
@@ -167,12 +179,10 @@ return newParentNode->parent;
   * @retval None
   */
 void memoryCheck() {
-    if (recordsCount + 1 >= BASE_SYMBOL_BUFFER * recordsMemoryBlockMultiplier) 
-        manageMemory(1);
     if ((lastSymbolInCache + 1) >= BASE_CACHE_ENTRIES * cacheMemoryBlockMultiplier) 
-        manageMemory(2);
+        manageMemory(1);
     if ((lastNode + 2) >= BASE_NODE_ENTRIES * nodesMemoryBlockMultiplier) 
-        manageMemory(3);
+        manageMemory(2);
 }
 
 /**
@@ -185,12 +195,11 @@ void manageMemory(uint16_t mode)
     switch (mode) {
     // Initialization    
     case 0:
+        records = (int8_t*)malloc(BASE_SYMBOL_BUFFER * sizeof(int8_t));
         nodes = (node**)malloc(BASE_NODE_ENTRIES * sizeof(node*));
         node* nodesMemoryBlock = (node*)malloc(BASE_NODE_ENTRIES * sizeof(node));
         for (int i = 0; i < BASE_NODE_ENTRIES; i++)
             nodes[i] = &nodesMemoryBlock[i];
-
-        records = (uint16_t*)malloc(BASE_SYMBOL_BUFFER * sizeof(uint16_t));
         symbolCache = (cacheEntry*)malloc(BASE_CACHE_ENTRIES * sizeof(cacheEntry));
 
         node* root = nodes[0];
@@ -225,28 +234,18 @@ void manageMemory(uint16_t mode)
         recordsCount = 0;
         break;
 
-    // Realloc for records    
-    case 1:
-        uint16_t oldSizeOfRecords = BASE_SYMBOL_BUFFER * recordsMemoryBlockMultiplier * sizeof(uint16_t);
-        recordsMemoryBlockMultiplier++;
-        uint16_t *temp = (uint16_t*)malloc(BASE_SYMBOL_BUFFER * recordsMemoryBlockMultiplier * sizeof(uint16_t));
-        memcpy(temp, records, oldSizeOfRecords);
-        free(records);
-        records = temp;
-        break;
-
     // Realloc for symbolCache
-    case 2: 
+    case 1: 
         uint16_t oldSizeOfCashe = BASE_CACHE_ENTRIES * cacheMemoryBlockMultiplier * sizeof(cacheEntry);
         cacheMemoryBlockMultiplier++;
-        cacheEntry* temp = (cacheEntry*)malloc(BASE_CACHE_ENTRIES * cacheMemoryBlockMultiplier * sizeof(cacheEntry));
-        memcpy(temp, symbolCache, oldSizeOfCashe);
+        cacheEntry* tempCache = (cacheEntry*)malloc(BASE_CACHE_ENTRIES * cacheMemoryBlockMultiplier * sizeof(cacheEntry));
+        memcpy(tempCache, symbolCache, oldSizeOfCashe);
         free(symbolCache);
-        symbolCache = temp;
+        symbolCache = tempCache;
         break;
 
     // Realloc for nodes array
-    case 3:
+    case 2:
         uint16_t numberOfNodes = BASE_NODE_ENTRIES * nodesMemoryBlockMultiplier;
         uint16_t oldSizeOfNodes = numberOfNodes * sizeof(node*);
     
@@ -254,21 +253,21 @@ void manageMemory(uint16_t mode)
         nodesMemoryBlockMultiplier++;
 
         // Allocate new memory blocks
-        node** temp = (node**)malloc(BASE_NODE_ENTRIES * nodesMemoryBlockMultiplier * sizeof(node*));
+        node** tempNodes = (node**)malloc(BASE_NODE_ENTRIES * nodesMemoryBlockMultiplier * sizeof(node*));
         node* newNodesMemoryBlock = (node*)malloc(BASE_NODE_ENTRIES * sizeof(node));
 
         // Copy old pointers into the new array and initialize pointers for new nodes
-        memcpy(temp, nodes, oldSizeOfNodes);
+        memcpy(tempNodes, nodes, oldSizeOfNodes);
         for (int i = numberOfNodes; i < BASE_NODE_ENTRIES * nodesMemoryBlockMultiplier; i++)
-            temp[i] = &newNodesMemoryBlock[i - numberOfNodes];
+            tempNodes[i] = &newNodesMemoryBlock[i - numberOfNodes];
 
         // Free old array and assign new memory
         free(nodes);
-        nodes = temp;
+        nodes = tempNodes;
         break;
 
     // Free all data
-    case 4:
+    case 3:
         for (int i = 0; i < BASE_NODE_ENTRIES * nodesMemoryBlockMultiplier; i++) 
             free(nodes[i]);
         free(nodes);
@@ -279,15 +278,68 @@ void manageMemory(uint16_t mode)
 }
 
 /**
-  * @brief Function responsible for loading data to records array, that means reading header, 
-  * seting record counter value (assign value from header), and making sure that we will end 
-  * reading data in right moment (we read all values -> reach counter = 0)
+  * @brief  Function ask user for file path and opens file if path is correct
   * @param None
-  * @retval Function returns record value if valid record was read from file,
-  *         0xFFFF if EOF is reached, -1 -> read parameter is not valid
+  * @retval 1 if error occured, 0 otherwise
   */
-uint16_t readFromStream() {
-    //TODO
+int openFile()
+{
+    char filePath[512];
+    printf("\nPlease enter valid path file: ");
+    if (scanf("%511s", filePath) != 1) { 
+        printf("\nError reading input.");
+        return 1;
+    }
+    fileToComprerss = fopen(filePath,"rb");
+    if (fileToComprerss == NULL) {
+        printf("\nError opening file");
+        return 1;
+    }
+    return 0;
+}
+
+/**
+  * @brief  Function skips header in file 
+  * @param None
+  * @retval None
+  */
+void skipHeader()
+{
+    char line[64];
+    uint16_t headerLines = 3;   // Each PGM Image File must consist of 3 header lines:
+                                // signature, rows and cols, max grey level
+    while (headerLines > 0) {
+        fgets(line, sizeof(line), fileToComprerss); // Read header line
+        if (line[0] == '#') continue;    // Skip all comments
+        headerLines--;    
+    }
+}
+
+/**
+  * @brief Function responsible for loading data to records array, that means reading 
+  * header and actual data, seting row width (assign value from header, we hardcode value 512 here)
+  * @param None
+  * @retval Function returns 0 if file is read correctly,
+  */
+int readDataFromFile()
+{
+    skipHeader();
+
+    // Read all data from file and store it in records array
+    for (int i = 0; i < IMAGE_ROW_WIDTH; i++) {
+        size_t bytesRead = fread(&records[i * IMAGE_ROW_WIDTH], 1, IMAGE_ROW_WIDTH, fileToComprerss);
+        if (bytesRead != IMAGE_ROW_WIDTH && !feof(fileToComprerss)) {
+            printf("Error reading data from file\n");
+            free(records);
+            fclose(fileToComprerss);
+            return 1;
+        }
+    }
+    // Check if we reached end of file
+    if (feof(fileToComprerss))
+        return 0;
+    printf("EOF not reached!\n");
+    return 1;
 }
 
 /**
@@ -297,8 +349,8 @@ uint16_t readFromStream() {
   * @param None
   * @retval None
   */
-void resolveTree() {
-    
+void resolveTree()
+{
     symbols = (symbol*)malloc(lastSymbolInCache * sizeof(symbol));
 
     for (int i = 0; i < lastSymbolInCache; i++) {
@@ -320,7 +372,7 @@ void resolveTree() {
 }
 
 /**
-  * @brief Function saves compressed stream to file with bit representation table
+  * @brief Function saves compressed stream to file according to bit representation table
   * @param None
   * @retval 
   */
