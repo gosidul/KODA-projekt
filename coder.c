@@ -4,8 +4,9 @@
 #include <cstring>
 
 #define IMAGE_ROW_WIDTH 512
-#define SYMBOL_LINK 0xFFFF
+
 #define BASE_SYMBOL_BUFFER  262144
+
 #define BASE_NODE_ENTRIES   128
 #define BASE_CACHE_ENTRIES  64
 
@@ -24,8 +25,8 @@ typedef struct node {
 } node;
 
 typedef struct cacheEntry {
-    uint16_t value;
-    node* nodesAddress;
+    int8_t value;
+    node** nodesAddress;
 } cacheEntry;
 
 typedef struct symbol {
@@ -47,9 +48,9 @@ int readDataFromFile();
 void constructTree();
 void resolveTree();
 void saveCompressedFile();
-node* searchCache(uint16_t symbol);
-node* addNewSymbol(uint16_t newSymbolValue);
-node* incrementNode (node* incrementedNode);
+node** searchCache(int8_t symbol);
+node** addNewSymbol(int8_t newSymbolValue);
+node** incrementNode (node** incrementedNode);
 void memoryCheck();
 
 int main()
@@ -77,13 +78,14 @@ void constructTree()
     node* root = nodes[0];
     while (recordCount < BASE_SYMBOL_BUFFER) {      // Function reads symbol values until EOF is reached
         memoryCheck();
-        node* symbol = NULL;
+        node** symbol = NULL;
         symbol = searchCache(record);
         if (symbol == NULL){
             symbol = addNewSymbol(record);
         } 
         root->count++;
-        while (symbol != root) {
+        while (*symbol != root) {
+            int vibecheck = 1;
             symbol = incrementNode(symbol);
         }
         record = records[++recordCount];
@@ -95,7 +97,7 @@ void constructTree()
   * @param symbol value of symbol from data stream
   * @retval NULL if no mach is found and symbol address if symbol was previously registered in cache
   */
-node* searchCache(uint16_t symbol)
+node** searchCache(int8_t symbol)
 {
     uint16_t temp = 0;
 
@@ -114,35 +116,33 @@ node* searchCache(uint16_t symbol)
   * @param Node Address of node that we will increment
   * @retval address of "parent" node of newly created node, to further tree reorganization
   */
-node* incrementNode (node* incrementedNode)
+node** incrementNode (node** incrementedNode)
 {
     // Increment count of node
-    incrementedNode->count++;
-
-    // Find the index of incrementedNode in the nodes array (for pointer arithmetic)
-    node** incrementedNodeAddress = &incrementedNode; 
+    (*incrementedNode)->count++;
 
     // Search for a node higher in the tree hierarchy that could be swapped with the node that was incremented
-    node** swapNodeAddress = incrementedNodeAddress;
-    while ((*swapNodeAddress)->count > (*swapNodeAddress - 1)->count) 
-        swapNodeAddress--;
+    node** swapNode = incrementedNode;
+    node** lowerNodeAddress = incrementedNode-1;
+
+    while ((*swapNode)->count > (*(swapNode - 1))->count) 
+        swapNode =  swapNode - 1;
         
     // If we just increment node value without altering tree hierarchy, exit function
-    if (incrementedNodeAddress == swapNodeAddress) 
-        return (*swapNodeAddress)->parent;
+    if (incrementedNode == swapNode) 
+        return &((*swapNode)->parent);
 
     // Swap nodes in tree hierarchy...
-    node** tempNodeaddress = swapNodeAddress;
-    *swapNodeAddress = *incrementedNodeAddress;
-    *incrementedNodeAddress = *tempNodeaddress;
+    node* tempNode = *swapNode;
+    *swapNode = *incrementedNode;
+    *incrementedNode = tempNode;
 
     // Swap their parents so they actually change places in the tree structure, not just in the array
-    node* swapNode = *swapNodeAddress;
-    node* tempParentNode = swapNode->parent;
-    swapNode->parent = incrementedNode->parent;
-    incrementedNode->parent = tempParentNode;
+    node* tempParentNode = (*swapNode)->parent;
+    (*swapNode)->parent = (*incrementedNode)->parent;
+    (*incrementedNode)->parent = tempParentNode;
 
-    return swapNode->parent;
+    return &((*swapNode)->parent);
 }
 
 /**
@@ -152,27 +152,28 @@ node* incrementNode (node* incrementedNode)
   * @param newSymbolValue new symbol registered in data stream not present in SymbolCache
   * @retval address of "parent" node of newly created node, to further tree reorganization
   */
-node* addNewSymbol(uint16_t newSymbolValue)
+node** addNewSymbol(int8_t newSymbolValue)
 {
 // Search for the highest symbol in tree structure with the lowest "count" value 
 uint16_t tempAddress = lastNode;
 while ((*nodes[tempAddress]).count == (*nodes[tempAddress - 1]).count) 
     tempAddress--;
 
-nodes[++lastNode] = nodes[tempAddress];     // Copy selected symbol struct address to new place in array 
+node* newParentNode = nodes[++lastNode];    // Create new node
+nodes[lastNode] = nodes[tempAddress];       // Copy selected symbol struct address to new place in array 
 node* selectedSymbolNode = nodes[lastNode]; // Treat its place in array as new address
-node* newParentNode = nodes[tempAddress];   // In place of previously reallocated node we will create new one
+nodes[tempAddress] = newParentNode;         // In place of previously reallocated node we will create new one
 node* newSymbolNode = nodes[++lastNode];    // Create new node for symbol
 
 // Add newly registered symbol to SymbolCache
-symbolCache[lastSymbolInCache].nodesAddress = newSymbolNode;
+symbolCache[++lastSymbolInCache].nodesAddress = &newSymbolNode;
 symbolCache[lastSymbolInCache].value = newSymbolValue;
 
 // Populate struct fields for new symbol
 newSymbolNode->count = 1;
 newSymbolNode->parent = newParentNode;
-newSymbolNode->link0 = (node*)SYMBOL_LINK;
-newSymbolNode->link1 = (node*)SYMBOL_LINK; 
+newSymbolNode->link0 = newSymbolNode;
+newSymbolNode->link1 = newSymbolNode; 
 
 // Create new node in "nodes" array that will have reallocated and new symbol set 
 // as its children, and "count" as sum of children "count" values, swap parents of 2 nodes
@@ -183,7 +184,7 @@ newParentNode->parent = selectedSymbolNode->parent;
 selectedSymbolNode->parent = newParentNode;
 
 // Return PARENT of added "node" to further tree reorganization
-return newParentNode->parent;
+return &(newParentNode->parent);
 }
 
 /**
@@ -230,18 +231,18 @@ void manageMemory(uint16_t mode)
 
             symbol1->count = 1;
             symbol1->parent = root;
-            symbol1->link0 = (node*)SYMBOL_LINK;    // Symbol
-            symbol1->link1 = (node*)SYMBOL_LINK;
+            symbol1->link0 = symbol1;    
+            symbol1->link1 = symbol1;
 
             symbol2->count = 1;
             symbol2->parent = root;
-            symbol2->link0 = (node*)SYMBOL_LINK;    // Symbol
-            symbol2->link1 = (node*)SYMBOL_LINK;
+            symbol2->link0 = symbol2;    
+            symbol2->link1 = symbol2;
 
-            cache0->nodesAddress = symbol1;
+            cache0->nodesAddress = &symbol1;
             cache0->value = 0;
 
-            cache1->nodesAddress = symbol2;
+            cache1->nodesAddress = &symbol2;
             cache1->value = 1;
 
             lastSymbolInCache = 1;
@@ -300,7 +301,7 @@ void manageMemory(uint16_t mode)
 int openFile()
 {
     char filePath[512];
-    printf("\nPlease enter valid path file: ");
+    printf("\nPlease enter valid path to file: ");
     if (scanf("%511s", filePath) != 1) { 
         printf("\nError reading input.");
         return 1;
@@ -370,18 +371,18 @@ void resolveTree()
 
     for (int i = 0; i < lastSymbolInCache; i++) {
         node* root = nodes[0];
-        node* node = symbolCache[i].nodesAddress;
+        node** node = symbolCache[i].nodesAddress;
 
         symbols[i].bits = 0;
         symbols[i].mask = 0;
 
-        while (node != root) {
-            if (node->parent == (node->parent)->link1)
+        while (*node != root) {
+            if ((*node)->parent == ((*node)->parent)->link1)
                 symbols[i].bits = (symbols[i].bits << 1) + 1;
             else
                 symbols[i].bits = (symbols[i].bits << 1);
         symbols[i].mask = (symbols[i].mask << 1) + 1;
-        node = node->parent;
+        *node = (*node)->parent;
         }
     }
 }
