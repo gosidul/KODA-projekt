@@ -330,14 +330,14 @@ void manageMemory(uint16_t mode)
   */
 int openFile()
 {
-    // char filePath[512];
-    // printf("\nPlease enter valid path file: ");
-    // if (scanf("%511s", filePath) != 1) { 
-    //     printf("\nError reading input.");
-    //     return 1;
-    // }
-    // fileToCompress = fopen(filePath,"rb");
-    fileToCompress = fopen("C:\\Users\\Admin\\Desktop\\obrazy_testowe\\boat.pgm", "rb");
+    char filePath[512];
+    printf("\nPlease enter valid path file: ");
+    if (scanf("%511s", filePath) != 1) { 
+        printf("\nError reading input.");
+        return 1;
+    }
+    fileToCompress = fopen(filePath,"rb");
+    
     if (fileToCompress == NULL) {
         printf("\nError opening file");
         return 1;
