@@ -3,10 +3,8 @@
 #include <stdlib.h>
 #include <cstring>
 
-#define IMAGE_ROW_WIDTH 512
-
+#define IMAGE_ROW_WIDTH     512
 #define BASE_SYMBOL_BUFFER  262144
-
 #define BASE_NODE_ENTRIES   128
 #define BASE_CACHE_ENTRIES  64
 
@@ -15,18 +13,21 @@ uint8_t nodesMemoryBlockMultiplier   = 1;
 
 uint16_t lastSymbolInCache;
 uint16_t lastNode;
-uint16_t recordsCount;
+uint32_t recordsCount;
+
+int debug = 0;
 
 typedef struct node {
-    uint16_t count;
     node* parent;
     node* link0;
     node* link1;
+    uint16_t positionInNodes;
+    uint32_t count;
 } node;
 
 typedef struct cacheEntry {
-    int8_t value;
-    node** nodesAddress;
+    int8_t symbolValue;
+    node* nodesAddress;
 } cacheEntry;
 
 typedef struct symbol {
@@ -48,15 +49,14 @@ int readDataFromFile();
 void constructTree();
 void resolveTree();
 void saveCompressedFile();
-node** searchCache(int8_t symbol);
-node** addNewSymbol(int8_t newSymbolValue);
-node** incrementNode (node** incrementedNode);
+node* searchCache(int8_t symbol);
+node* addNewSymbol(int8_t newSymbolValue);
+node* incrementNode (node* incrementedNode);
 void memoryCheck();
 
 int main()
 {
     manageMemory(0);
-    printf("Memory initialized");
     if (openFile())
         return 0;
     if (readDataFromFile())
@@ -73,41 +73,19 @@ int main()
 
 void constructTree()
 {
-    uint16_t recordCount = 0;
-    int8_t record = records[recordCount];
+    int8_t record = records[recordsCount];
     node* root = nodes[0];
-    while (recordCount < BASE_SYMBOL_BUFFER) {      // Function reads symbol values until EOF is reached
+    while (recordsCount < BASE_SYMBOL_BUFFER) {      // Function reads symbol values until EOF is reached
         memoryCheck();
-        node** symbol = NULL;
+        node* symbol = NULL;
         symbol = searchCache(record);
-        if (symbol == NULL){
+        if (symbol == NULL)
             symbol = addNewSymbol(record);
-        } 
         root->count++;
-        while (*symbol != root) {
-            int vibecheck = 1;
+        while (symbol != root)
             symbol = incrementNode(symbol);
-        }
-        record = records[++recordCount];
+        record = records[++recordsCount];
     }
-}
-
-/**
-  * @brief  Function searches cache for symbol, if mach is found value of symbol is returned
-  * @param symbol value of symbol from data stream
-  * @retval NULL if no mach is found and symbol address if symbol was previously registered in cache
-  */
-node** searchCache(int8_t symbol)
-{
-    uint16_t temp = 0;
-
-    // Search the cache
-    while (temp <= lastSymbolInCache) {
-        if (symbolCache[temp].value == symbol)
-            return symbolCache[temp].nodesAddress;
-        temp++;
-    }
-    return NULL;
 }
 
 /**
@@ -116,33 +94,46 @@ node** searchCache(int8_t symbol)
   * @param Node Address of node that we will increment
   * @retval address of "parent" node of newly created node, to further tree reorganization
   */
-node** incrementNode (node** incrementedNode)
+node* incrementNode (node* incrementedNode)
 {
+    // Search for a node higher in the tree hierarchy that could be swapped with the node that we will increment
+    uint16_t tempAddress = incrementedNode->positionInNodes;
+
+    while (nodes[tempAddress]->count == nodes[tempAddress - 1]->count) 
+        tempAddress--;
+
+    node* swapedNode = nodes[tempAddress];
+
     // Increment count of node
-    (*incrementedNode)->count++;
-
-    // Search for a node higher in the tree hierarchy that could be swapped with the node that was incremented
-    node** swapNode = incrementedNode;
-    node** lowerNodeAddress = incrementedNode-1;
-
-    while ((*swapNode)->count > (*(swapNode - 1))->count) 
-        swapNode =  swapNode - 1;
-        
+    incrementedNode->count++;
+      
     // If we just increment node value without altering tree hierarchy, exit function
-    if (incrementedNode == swapNode) 
-        return &((*swapNode)->parent);
+    if (tempAddress == incrementedNode->positionInNodes) 
+        return incrementedNode->parent;
 
-    // Swap nodes in tree hierarchy...
-    node* tempNode = *swapNode;
-    *swapNode = *incrementedNode;
-    *incrementedNode = tempNode;
+    //Swap nodes in tree hierarchy...
+    nodes[swapedNode->positionInNodes] = incrementedNode;
+    nodes[incrementedNode->positionInNodes] = swapedNode;
 
-    // Swap their parents so they actually change places in the tree structure, not just in the array
-    node* tempParentNode = (*swapNode)->parent;
-    (*swapNode)->parent = (*incrementedNode)->parent;
-    (*incrementedNode)->parent = tempParentNode;
+    tempAddress = swapedNode->positionInNodes;
+    swapedNode->positionInNodes = incrementedNode->positionInNodes;
+    incrementedNode->positionInNodes = tempAddress;
 
-    return &((*swapNode)->parent);
+    // Update link of Parent nodes of swapped symbols
+    if ((swapedNode->parent)->link1 == swapedNode)
+        (swapedNode->parent)->link1 = incrementedNode;
+    else (swapedNode->parent)->link0 = incrementedNode;
+
+    if ((incrementedNode->parent)->link1 == incrementedNode)
+        (incrementedNode->parent)->link1 = swapedNode;
+    else (incrementedNode->parent)->link0 = swapedNode;
+
+    // Swap their parents so they actually change places in the tree structure
+    node* tempNode = swapedNode->parent;
+    swapedNode->parent = incrementedNode->parent;
+    incrementedNode->parent = tempNode;
+
+    return incrementedNode->parent;
 }
 
 /**
@@ -152,39 +143,71 @@ node** incrementNode (node** incrementedNode)
   * @param newSymbolValue new symbol registered in data stream not present in SymbolCache
   * @retval address of "parent" node of newly created node, to further tree reorganization
   */
-node** addNewSymbol(int8_t newSymbolValue)
+node* addNewSymbol(int8_t newSymbolValue)
 {
 // Search for the highest symbol in tree structure with the lowest "count" value 
 uint16_t tempAddress = lastNode;
 while ((*nodes[tempAddress]).count == (*nodes[tempAddress - 1]).count) 
     tempAddress--;
 
-node* newParentNode = nodes[++lastNode];    // Create new node
-nodes[lastNode] = nodes[tempAddress];       // Copy selected symbol struct address to new place in array 
-node* selectedSymbolNode = nodes[lastNode]; // Treat its place in array as new address
-nodes[tempAddress] = newParentNode;         // In place of previously reallocated node we will create new one
+node* newParentNode = nodes[++lastNode];    // Copy pointer to newParentNode variable
+nodes[lastNode] = nodes[tempAddress];       // Put selected symbol struct address to new place in array 
+nodes[tempAddress] = newParentNode;         // In place of previously reallocated node we will put copied pointer
+node* selectedSymbolNode = nodes[lastNode]; // selectedSymbolNode is realocated
 node* newSymbolNode = nodes[++lastNode];    // Create new node for symbol
 
 // Add newly registered symbol to SymbolCache
-symbolCache[++lastSymbolInCache].nodesAddress = &newSymbolNode;
-symbolCache[lastSymbolInCache].value = newSymbolValue;
+symbolCache[lastSymbolInCache].nodesAddress = newSymbolNode;
+symbolCache[lastSymbolInCache].symbolValue = newSymbolValue;
 
 // Populate struct fields for new symbol
 newSymbolNode->count = 1;
 newSymbolNode->parent = newParentNode;
 newSymbolNode->link0 = newSymbolNode;
-newSymbolNode->link1 = newSymbolNode; 
+newSymbolNode->link1 = newSymbolNode;
+newSymbolNode->positionInNodes = lastNode;
 
 // Create new node in "nodes" array that will have reallocated and new symbol set 
 // as its children, and "count" as sum of children "count" values, swap parents of 2 nodes
-newParentNode->count = selectedSymbolNode->count + newSymbolNode->count;
+newParentNode->count = selectedSymbolNode->count + 1;
 newParentNode->link0 = newSymbolNode;
 newParentNode->link1 = selectedSymbolNode;
+
+// Update link of Parent node of swapped symbol
+if ((selectedSymbolNode->parent)->link1 == selectedSymbolNode)
+    (selectedSymbolNode->parent)->link1 = newParentNode;
+else (selectedSymbolNode->parent)->link0 = newParentNode;
+
 newParentNode->parent = selectedSymbolNode->parent; 
 selectedSymbolNode->parent = newParentNode;
 
-// Return PARENT of added "node" to further tree reorganization
-return &(newParentNode->parent);
+// Update hierarchy representation inside nodes
+newParentNode->positionInNodes = selectedSymbolNode->positionInNodes;
+selectedSymbolNode->positionInNodes = lastNode - 1;
+
+
+// Return PARENT of added "node" to further tree reorganizatio
+
+return newParentNode->parent;
+}
+
+/**
+  * @brief  Function searches cache for symbol, if mach is found value of symbol is returned
+  * @param symbol value of symbol from data stream
+  * @retval NULL if no mach is found and symbol address if symbol was previously registered in cache
+  */
+node* searchCache(int8_t symbol)
+{
+    uint16_t temp = 0;
+
+    // Search the cache
+    while (temp <= lastSymbolInCache) {
+        if (symbolCache[temp].symbolValue == symbol)
+            return symbolCache[temp].nodesAddress;
+        temp++;
+    }
+    lastSymbolInCache++;
+    return NULL;
 }
 
 /**
@@ -212,10 +235,12 @@ void manageMemory(uint16_t mode)
     // Initialization    
         case 0: {
             records = (int8_t*)malloc(BASE_SYMBOL_BUFFER * sizeof(int8_t));
+
             nodes = (node**)malloc(BASE_NODE_ENTRIES * sizeof(node*));
             node* nodesMemoryBlock = (node*)malloc(BASE_NODE_ENTRIES * sizeof(node));
             for (int i = 0; i < BASE_NODE_ENTRIES; i++)
                 nodes[i] = &nodesMemoryBlock[i];
+
             symbolCache = (cacheEntry*)malloc(BASE_CACHE_ENTRIES * sizeof(cacheEntry));
 
             node* root = nodes[0];
@@ -228,26 +253,31 @@ void manageMemory(uint16_t mode)
             root->parent = root;   // Root
             root->link0 = symbol1;
             root->link1 = symbol2;
+            root->positionInNodes = 0;
 
             symbol1->count = 1;
             symbol1->parent = root;
-            symbol1->link0 = symbol1;    
+            symbol1->link0 = symbol1;    // Symbol
             symbol1->link1 = symbol1;
+            symbol1->positionInNodes = 1;
 
             symbol2->count = 1;
             symbol2->parent = root;
-            symbol2->link0 = symbol2;    
+            symbol2->link0 = symbol2;    // Symbol
             symbol2->link1 = symbol2;
+            symbol2->positionInNodes = 2;
 
-            cache0->nodesAddress = &symbol1;
-            cache0->value = 0;
+            cache0->nodesAddress = symbol1;
+            cache0->symbolValue = 0;
 
-            cache1->nodesAddress = &symbol2;
-            cache1->value = 1;
+            cache1->nodesAddress = symbol2;
+            cache1->symbolValue = 1;
 
             lastSymbolInCache = 1;
             lastNode = 2;
             recordsCount = 0;
+
+            printf("Memory initialized");
             break;
         }
         // Realloc for symbolCache
@@ -284,7 +314,7 @@ void manageMemory(uint16_t mode)
         }
         // Free all data
         case 3: {
-            free(nodes[0]);
+            free(nodes[0]); // TODO: Implement free of all data stored
             free(nodes);
             free(symbolCache);
             free(records);
@@ -300,13 +330,14 @@ void manageMemory(uint16_t mode)
   */
 int openFile()
 {
-    char filePath[512];
-    printf("\nPlease enter valid path to file: ");
-    if (scanf("%511s", filePath) != 1) { 
-        printf("\nError reading input.");
-        return 1;
-    }
-    fileToCompress = fopen(filePath,"rb");
+    // char filePath[512];
+    // printf("\nPlease enter valid path file: ");
+    // if (scanf("%511s", filePath) != 1) { 
+    //     printf("\nError reading input.");
+    //     return 1;
+    // }
+    // fileToCompress = fopen(filePath,"rb");
+    fileToCompress = fopen("C:\\Users\\Admin\\Desktop\\obrazy_testowe\\boat.pgm", "rb");
     if (fileToCompress == NULL) {
         printf("\nError opening file");
         return 1;
@@ -315,14 +346,14 @@ int openFile()
 }
 
 /**
-  * @brief  Function skips header in file 
+  * @brief  Function skips header of file 
   * @param None
   * @retval None
   */
 void skipHeader()
 {
     char line[64];
-    uint16_t headerLines = 3;   // Each PGM Image File must consist of 3 header lines:
+    uint8_t headerLines = 3;   // Each PGM Image File must consist of 3 header lines:
                                 // signature, rows and cols, max grey level
     while (headerLines > 0) {
         fgets(line, sizeof(line), fileToCompress); // Read header line
@@ -371,18 +402,18 @@ void resolveTree()
 
     for (int i = 0; i < lastSymbolInCache; i++) {
         node* root = nodes[0];
-        node** node = symbolCache[i].nodesAddress;
+        node* node = symbolCache[i].nodesAddress;
 
         symbols[i].bits = 0;
         symbols[i].mask = 0;
 
-        while (*node != root) {
-            if ((*node)->parent == ((*node)->parent)->link1)
-                symbols[i].bits = (symbols[i].bits << 1) + 1;
+        while (node != root) {
+            if (node == (node->parent)->link1) // If our parent has us as its link1 children save "1" as bit 
+                symbols[i].bits = (symbols[i].bits << 1) + 1; // else save "0"
             else
                 symbols[i].bits = (symbols[i].bits << 1);
         symbols[i].mask = (symbols[i].mask << 1) + 1;
-        *node = (*node)->parent;
+        node = node->parent;
         }
     }
 }
