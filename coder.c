@@ -11,7 +11,7 @@
 uint8_t cacheMemoryBlockMultiplier   = 1;
 uint8_t nodesMemoryBlockMultiplier   = 1;
 
-uint16_t lastSymbolInCache;
+uint8_t lastSymbolInCache;
 uint16_t lastNode;
 uint32_t recordsCount;
 
@@ -31,8 +31,9 @@ typedef struct cacheEntry {
 } cacheEntry;
 
 typedef struct symbol {
+    int8_t symbolValue;
+    uint8_t mask;
     uint32_t bits;
-    uint32_t mask;
 } symbol;
 
 symbol* symbols = NULL;
@@ -47,12 +48,13 @@ void manageMemory(uint16_t mode);
 int openFile();
 int readDataFromFile();
 void constructTree();
-void resolveTree();
+void createSymbolTable();
 void saveCompressedFile();
 node* searchCache(int8_t symbol);
 node* addNewSymbol(int8_t newSymbolValue);
 node* incrementNode (node* incrementedNode);
 void memoryCheck();
+int compareSymbols( const symbol* symbol1, const symbol* symbol2 );
 
 int main()
 {
@@ -62,7 +64,7 @@ int main()
     if (readDataFromFile())
         return 0;
     constructTree();
-    resolveTree();
+    createSymbolTable();
     saveCompressedFile();
     if (fileToCompress) 
         fclose(fileToCompress);
@@ -184,7 +186,6 @@ selectedSymbolNode->parent = newParentNode;
 // Update hierarchy representation inside nodes
 newParentNode->positionInNodes = selectedSymbolNode->positionInNodes;
 selectedSymbolNode->positionInNodes = lastNode - 1;
-
 
 // Return PARENT of added "node" to further tree reorganizatio
 
@@ -337,7 +338,7 @@ int openFile()
         return 1;
     }
     fileToCompress = fopen(filePath,"rb");
-    
+
     if (fileToCompress == NULL) {
         printf("\nError opening file");
         return 1;
@@ -396,27 +397,52 @@ int readDataFromFile()
   * @param None
   * @retval None
   */
-void resolveTree()
+void createSymbolTable()
 {
     symbols = (symbol*)malloc(lastSymbolInCache * sizeof(symbol));
 
-    for (int i = 0; i < lastSymbolInCache; i++) {
+    for (int i = 0; i <= lastSymbolInCache; i++) {
         node* root = nodes[0];
         node* node = symbolCache[i].nodesAddress;
 
         symbols[i].bits = 0;
         symbols[i].mask = 0;
+        symbols[i].symbolValue = symbolCache[i].symbolValue;
 
         while (node != root) {
             if (node == (node->parent)->link1) // If our parent has us as its link1 children save "1" as bit 
                 symbols[i].bits = (symbols[i].bits << 1) + 1; // else save "0"
             else
                 symbols[i].bits = (symbols[i].bits << 1);
-        symbols[i].mask = (symbols[i].mask << 1) + 1;
+        symbols[i].mask++;
+
+        if ( i == lastSymbolInCache) {
+            debug++;
+        }
+
         node = node->parent;
         }
     }
+
+    qsort(symbols, (lastSymbolInCache + 1), sizeof(symbol), (int(*)(const void*, const void*))compareSymbols);
+
+    int highestMask = symbols[lastSymbolInCache].mask;
+    int maskGroup[highestMask + 1]; // Ensure array can hold counts for all mask values
+    memset(maskGroup, 0, sizeof(maskGroup)); // Initialize counts to 0
+
+    for (int i = 0; i <= lastSymbolInCache; i++) {
+        maskGroup[symbols[i].mask]++;
+    }
+    debug = 1;
 }
+
+int compareSymbols( const symbol* symbol1, const symbol* symbol2 )
+{
+    if(symbol1->mask > symbol2->mask) return 1;
+    if(symbol1->mask < symbol2->mask) return -1;
+    return 0;
+}
+
 
 /**
   * @brief Function saves compressed stream to file according to bit representation table
