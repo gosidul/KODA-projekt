@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <cstring>
+#include <string.h>
 
 #define IMAGE_ROW_WIDTH     512
 #define BASE_SYMBOL_BUFFER  262144
@@ -40,6 +40,7 @@ symbol* symbols = NULL;
 int8_t* records = NULL;
 cacheEntry* symbolCache = NULL;
 node** nodes = NULL;
+int8_t* maskGroup = NULL;
 
 FILE *fileToCompress = NULL;
 FILE *compressedFile = NULL;
@@ -55,6 +56,8 @@ node* addNewSymbol(int8_t newSymbolValue);
 node* incrementNode (node* incrementedNode);
 void memoryCheck();
 int compareSymbols( const symbol* symbol1, const symbol* symbol2 );
+int createCompressedFile();
+int writeToFile();
 
 int main()
 {
@@ -64,7 +67,6 @@ int main()
     if (readDataFromFile())
         return 0;
     constructTree();
-    createSymbolTable();
     saveCompressedFile();
     if (fileToCompress) 
         fclose(fileToCompress);
@@ -427,13 +429,12 @@ void createSymbolTable()
     qsort(symbols, (lastSymbolInCache + 1), sizeof(symbol), (int(*)(const void*, const void*))compareSymbols);
 
     int highestMask = symbols[lastSymbolInCache].mask;
-    int maskGroup[highestMask + 1]; // Ensure array can hold counts for all mask values
-    memset(maskGroup, 0, sizeof(maskGroup)); // Initialize counts to 0
+    maskGroup = (int*)malloc((highestMask + 1) * sizeof(int)); // Ensure array can hold counts for all mask values
+    memset(maskGroup, 0, (highestMask + 1)*sizeof(int)); // Initialize counts to 0
 
     for (int i = 0; i <= lastSymbolInCache; i++) {
         maskGroup[symbols[i].mask]++;
     }
-    debug = 1;
 }
 
 int compareSymbols( const symbol* symbol1, const symbol* symbol2 )
@@ -443,6 +444,43 @@ int compareSymbols( const symbol* symbol1, const symbol* symbol2 )
     return 0;
 }
 
+/**
+  * @brief  Function ask user for name of compressed file and creates file if name is correct
+  * @param None
+  * @retval 1 if error occured, 0 otherwise
+  */
+int createCompressedFile()
+{
+    char fileName[256];
+    printf("\nPlease enter valid file name: ");
+    if (scanf("%255s", fileName) != 1) { 
+        printf("\nError reading input.");
+        return 1;
+    }
+    snprintf(fileName, sizeof(fileName), "%s.bin", fileName);
+    compressedFile = fopen(fileName,"wb");
+
+    if (compressedFile == NULL) {
+        printf("\nError opening file");
+        return 1;
+    }
+    return 0;
+}
+
+/**
+  * @brief  Writes header and compressed data to file
+  * @param None
+  * @retval 1 if error occured, 0 otherwise
+  */
+int writeToFile()
+{
+    fwrite(&lastSymbolInCache, 1, 1, compressedFile);
+    for (int i = 0; i < lastSymbolInCache; i++)
+        fwrite(&symbols[i].symbolValue, 1, 1, compressedFile);
+    fwrite(&symbols[lastSymbolInCache].mask, 1, 1, compressedFile);
+    fwrite(maskGroup, symbols[lastSymbolInCache].mask, 1, compressedFile);
+    return 0;
+}
 
 /**
   * @brief Function saves compressed stream to file according to bit representation table
@@ -451,5 +489,7 @@ int compareSymbols( const symbol* symbol1, const symbol* symbol2 )
   */
 void saveCompressedFile()
 {
-    //TODO
+    createCompressedFile();
+    createSymbolTable();
+    writeToFile();
 }
