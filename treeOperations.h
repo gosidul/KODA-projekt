@@ -1,14 +1,17 @@
 #ifndef TREE_OPERATIONS_H
 #define TREE_OPERATIONS_H
 
-// #include "fileOperations.h"
+#define BASE_NODES_ENTRIES 32
+#define BASE_CACHE_ENTRIES 16
+#define BITS_IN_BYTE 8
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
 /**
- * Represents buffer to store data before writing it to file.
+ * @brief:  Represents buffer to store data before writing it to file.
  * @buffer: Variable that stores appended bit paths and symbol values
  * @freeBits: Represent number of free bits left in buffer
  */
@@ -18,7 +21,7 @@ typedef struct dataBuffer {
 } dataBuffer;
 
 /**
- * Represents a node in the Huffman tree.
+ * @brief:  Represents a node in the Huffman tree.
  * @parent: Pointer to the parent node.
  * @link0: Pointer to the child node representing a "0" in the bit stream path.
  * @link1: Pointer to the child node representing a "1" in the bit stream path.
@@ -35,7 +38,7 @@ typedef struct node {
 } node;
 
 /**
- * Represents a tree structure containing nodes and metadata for memory management.
+ * @brief: Represents a tree structure containing nodes and metadata for memory management.
  * @nodes: Array of pointers to node structs, used to create the tree.
  * @baseNumberOfNodes: Base size of memory chunk for nodes.
  * @memoryBlockMultiplier: Number of memory blocks allocated for nodes.
@@ -49,7 +52,7 @@ typedef struct tree {
 } tree;
 
 /**
- * Represents a single entry in the symbol cache.
+ * @brief:  Represents a single entry in the symbol cache.
  * @treeAddress: Pointer to a node in the tree structure representing the symbol.
  * @symbolValue: Value of the symbol associated with this cache entry.
  */
@@ -59,7 +62,7 @@ typedef struct cacheEntry {
 } cacheEntry;
 
 /**
- * Represents a cache for storing symbol recorded in data stream.
+ * @brief:  Represents a cache for storing symbol recorded in data stream.
  * @symbolCache: Array of cacheEntry structs for symbol lookup.
  * @lastSymbolPath: Last processed symbol's path in the tree.
  * @baseNumberOfEntries: Base size for the memory chunk of the cache.
@@ -74,7 +77,7 @@ typedef struct cache {
 } cache;
 
 /**
- * Manages a 2D matrix of int8_t records with sequential access capabilities.
+ * @brief:  Manages a 2D matrix of int8_t records with sequential access capabilities.
  * @matrix: Dynamically allocated 2D array of uint8_t values.
  * @currentRow: Current row index being accessed in the matrix.
  * @currentColumn: Current column index being accessed in the current row.
@@ -88,8 +91,8 @@ typedef struct records {
 } records;
 
 /**
- * Represents the main structure for managing the Huffman codec, 
- * including input records, symbol cache, and the Huffman tree.
+ * @brief:  Represents the main structure for managing the Huffman codec, 
+ *          including input records, symbol cache, and the Huffman tree.
  * @bitBuffer: A `dataBuffer` structure containing bits ready to be written to file
  * @compressedFile: A pointer to `FILE` object containing information used while writing data
  * @records: A `records` structure for managing the 2D matrix of input data.
@@ -105,22 +108,27 @@ typedef struct handler {
 } handler;
 
 /**
- * Allocates and initializes a new `handler` structure, including its internal 
- * components (`records`, `cache`, and `tree`).
- *
+ * @brief: Allocates and initializes a new `handler` structure, including its internal 
+ *         components (`records`, `cache`, and `tree`).
  * @return A pointer to the newly created `handler` structure. 
  *         Returns `NULL` if memory allocation fails.
  **/
 handler* createHandler();
 
 /**
-  * @brief  Initialize tree by loading records to records buffer, allocating memory for tree and cache
+  * @brief: Initialize tree by loading records to records buffer, allocating memory for tree and cache
   *         and creating base tree consistiong of root, first symbol from stream and NewSymbol node
   * @param  my A pointer to handler struct containing information about tree, cache and records
   * @retval 0 if successfully created tree and buffer, 1 otherwise
   */
 uint8_t initialize(handler* my);
 
+/**
+  * @brief: Constructs the Huffman tree and compresses input data dynamically.
+  *         Iterates through input records, updates the tree structure, and encodes data.
+  * @param  my A pointer to the handler struct containing the Huffman tree, cache, and data records.
+  * @retval 0 if the tree is successfully constructed and data compressed, 1 on error.
+  */
 uint8_t constructTree(handler* my);
 
 #endif // TREE_OPERATIONS
