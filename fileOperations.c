@@ -134,7 +134,7 @@ uint8_t writeRemainingBits(dataBuffer* my, FILE* compressedFile)
         bufferSize -= 8;
         bytes++;
     }
-    if (fwrite(&my->buffer, 1, bytes, compressedFile) != 1) {
+    if (fwrite(&my->buffer, 1, bytes, compressedFile) != bytes) {
         printf("Error: Cannot write remaining bits to file\n");
         return 1;
     }
