@@ -35,17 +35,10 @@ uint8_t readDataFromFile(records* my);
   * @param  compressedFile Pointer to FILE object.
   * @param  my Pointer to struct containing data.
   * @param  data Variable which holds data we want write to file.
-  * @param  count Variable which holds number of bits we want write to file including leading zeros.
+  * @param  count Variable which holds number of bits we want write to file.
+  *         Set as "0" to append remaining bits in buffer
   * @return 0 if write was succesfull, or 1 if an error occurs.
   */
-uint8_t writeToFile(FILE* compressedFile, dataBuffer* my, uint32_t input, uint8_t count);
-
-/**
-  * @brief  Function writes remaining bits in buffer to file and closes it.
-  * @param  my Pointer to struct containing data
-  * @param  compressedFile Pointer to FILE object
-  * @retval 0 if write was succesfull and file is closed, or 1 if an error occurs.
-  */
-uint8_t writeRemainingBits(dataBuffer* my, FILE* compressedFile);
+uint8_t writeToFile(dataBuffer* my, FILE* compressedFile, uint32_t input, uint8_t count);
 
 #endif // FILE_OPERATIONS_H
