@@ -1,12 +1,6 @@
 #include "treeOperations.h"
 #include "fileOperations.h"
 
-#define BASE_NODES_ENTRIES 16
-#define BASE_CACHE_ENTRIES 4
-#define ROW_SIZE 512
-#define COL_SIZE 512
-#define BITS_IN_BYTE 8
-
 /**
  * @brief  Retrieves the next record from the `records` matrix in a sequential manner.
  *         If the end of the current row is reached, it moves to the next row. If the 
@@ -119,11 +113,11 @@ void appendPathToFile(handler* my, node* _node)
     }
 
     if (_node->positionInTree == my->tree.lastNode) {
-        bits = (bits << BITS_IN_BYTE) + my->records.matrix[my->records.currentDimension[0]][my->records.currentDimension[1]];
+        bits = (bits << BITS_IN_BYTE) + my->cache.symbolCache[my->cache.lastCacheEntry].symbolValue;
         mask += BITS_IN_BYTE;
     }
 
-    if (writeToFile(my->compressedFile, &my->bitBuffer, bits, mask)) printf("ERROR: Cannot write to file!");
+    if (writeToFile(&my->bitBuffer, my->compressedFile, bits, mask)) printf("ERROR: Cannot write to file!");
 }
 
 /**
@@ -215,7 +209,7 @@ uint8_t initialize(handler* my)
     newSymbol->link1 = NULL;
     newSymbol->positionInTree = my->tree.lastNode;   // NewSymbol -> position in tree = tree.lastNode
 
-    if (writeToFile(my->compressedFile, &my->bitBuffer, cachedSymbol0->symbolValue, 9)) printf("ERROR: Cannot write to file!");
+    if (writeToFile(&my->bitBuffer, my->compressedFile, cachedSymbol0->symbolValue, 9)) printf("ERROR: Cannot write to file!");
 
     return 0;
 }
@@ -325,9 +319,8 @@ newParentNode->count = 1;
 newParentNode->link0 = symbolFromStream;
 newParentNode->link1 = newSymbolNode;
 
-// Add newly registered symbol to SymbolCache
-my->cache.symbolCache[++my->cache.lastCacheEntry].treeAddress = symbolFromStream;
-my->cache.symbolCache[my->cache.lastCacheEntry].symbolValue = newValue;
+// Add newly registered symbol address to SymbolCache
+my->cache.symbolCache[my->cache.lastCacheEntry].treeAddress = symbolFromStream;
 
 // Return parent of newParentNode for further tree reorganization
 return newParentNode->parent;
@@ -351,7 +344,8 @@ node* searchCache(handler* my, uint8_t symbol)
             appendPathToFile(my, my->cache.symbolCache[i].treeAddress);
             return my->cache.symbolCache[i].treeAddress;
         }
-    // If no match found append NewSymbol
+    // If no match found, expand cache by new value and append NewSymbol to file
+    my->cache.symbolCache[++my->cache.lastCacheEntry].symbolValue = symbol;
     appendPathToFile(my, my->tree.nodes[my->tree.lastNode]);
     return addNewSymbol(my, symbol);
 }
@@ -366,6 +360,7 @@ uint8_t constructTree(handler* my)
         while (symbol->parent != NULL)
             symbol = rearrangeTree(my, symbol);
     }
-    if (writeRemainingBits(&my->bitBuffer, my->compressedFile)) return 1;
+    // Write remaining bits in buffer
+    if (writeToFile(&my->bitBuffer, my->compressedFile, 0, 0)) return 1;
     return 0;
 }
