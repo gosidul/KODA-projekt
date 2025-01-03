@@ -12,7 +12,7 @@ FILE* openFile()
 
     printf("\nPlease enter valid path to file to compress:\n");
 
-    //strcpy((char *)filePath, "C:\\Cpp\\projects\\CODEC\\chronometer.pgm"); //              <--- for debug, clear later: #include <string.h> // For strcpy
+    // strcpy((char *)filePath, "C:\\Users\\Admin\\Desktop\\obrazy_testowe\\charlie_generated.pgm"); //              <--- for debug, clear later: #include <string.h> // For strcpy
 
     if (scanf("%511s", filePath) != 1) { 
         printf("\nError: Invalid input. Please try again.\n");
@@ -36,7 +36,7 @@ FILE* createCompressedFile()
 
     printf("\nPlease enter valid file name for compressed data:\n");
 
-    //strcpy((char *)fileName, "Compressed"); //                                              <--- for debug, clear later: #include <string.h> // For strcpy
+    // strcpy((char*)fileName, "compressed"); //                                              <--- for debug, clear later: #include <string.h> // For strcpy
 
     if (scanf("%250s", fileName) != 1) { 
         printf("\nError reading input.");
@@ -118,54 +118,23 @@ uint8_t readDataFromFile(records* my)
     return 0;
 }
 
-uint8_t writeToFile(FILE* compressedFile, dataBuffer* my, uint32_t input, uint8_t count)
-{
-    // Move input data to bigger variable to match buffer.buffer size
-    // Prepare data to append it to the buffer by calculating bitwise shift to match buffer end
-    uint64_t data = input;
-    int8_t shift = my->freeBits - count;
-
-    // If overflow happened buffer.buffer can't fit all new bits
-    if (shift < 0) {
-        // Calculate shift for these bits that will fit in buffer by changing sign of shift
-        // only bits that will fit into buffer remain in variable, since we are using right shift
-        my->buffer += data >> -shift;
-
-        // Write data to a file from a buffer, return "0" if error occurs
-        my->buffer = _byteswap_uint64(my->buffer); // swap endiannes if necesarry
-        if (fwrite(&my->buffer, BUFFER_BYTE_LENGTH, 1, compressedFile) != 1) return 1;
-
-        // Prepare buffer for new data clearing its bit fields
-        my->buffer = 0;
-
-        // Set freeBits counter to max value and update count 
-        // to match number of bits that are not added yet
-        count = count - my->freeBits;
-        my->freeBits = BUFFER_BIT_LEN;
-
-        // Calculate new shift 
-        shift = my->freeBits - count;
-    }
-    my->buffer += data << shift;
-    my->freeBits = my->freeBits - count;
-    return 0;
-}
-
+/**
+  * @brief  Function writes remaining bits in buffer to file and closes it.
+  * @param  my Pointer to struct containing data
+  * @param  compressedFile Pointer to FILE object
+  * @retval 0 if write was succesfull and file is closed, or 1 if an error occurs.
+  */
 uint8_t writeRemainingBits(dataBuffer* my, FILE* compressedFile)
 {
-    if (my->freeBits == BUFFER_BIT_LEN) {
-        if (fclose(compressedFile)) {
-            printf("Error: Error during closing file\n");
-            return 1;
-        }
-        printf("File successfully written and closed\n");
-        return 0;
-    }
-
-    my->buffer = my->buffer >> my->freeBits;
     my->buffer = _byteswap_uint64(my->buffer);
+    int8_t bufferSize = BUFFER_BIT_LEN - my->freeBits;
+    uint8_t bytes = 0;
 
-    if (fwrite(&my->buffer, BUFFER_BYTE_LENGTH, 1, compressedFile) != 1) {
+    while (bufferSize > 0) {
+        bufferSize -= 8;
+        bytes++;
+    }
+    if (fwrite(&my->buffer, 1, bytes, compressedFile) != 1) {
         printf("Error: Cannot write remaining bits to file\n");
         return 1;
     }
@@ -173,6 +142,39 @@ uint8_t writeRemainingBits(dataBuffer* my, FILE* compressedFile)
         printf("Error: Error during closing file\n");
         return 1;
     }
+
     printf("File successfully written and closed\n");
+    return 0;
+}
+
+uint8_t writeToFile(dataBuffer* my, FILE* compressedFile, uint32_t input, uint8_t count)
+{
+    // count = 0 -> end of data to compress
+    if (!count) {
+        if (writeRemainingBits(my, compressedFile)) 
+            return 1;
+        return 0;
+    }
+    // Prepare data to append it to the buffer by calculating bitwise shift to match buffer end
+    uint64_t data = input;
+    int8_t shift = my->freeBits - count;
+
+    // If overflow happened buffer.buffer can't fit all new bits
+    if (shift < 0) {
+        // Calculate shift for these bits that will fit in buffer by changing sign of shift
+        my->buffer += data >> -shift;
+        my->buffer = _byteswap_uint64(my->buffer); // swap endiannes if necesarry
+
+        // Write data to a file from a buffer, return "0" if error occurs, clear buffer
+        if (fwrite(&my->buffer, BUFFER_BYTE_LENGTH, 1, compressedFile) != 1) return 1;
+        my->buffer = 0;
+
+        // Update count to match number of bits that are not added yet and calculate new shift
+        count = count - my->freeBits;
+        my->freeBits = BUFFER_BIT_LEN;
+        shift = my->freeBits - count;
+    }
+    my->buffer += data << shift;
+    my->freeBits = my->freeBits - count;
     return 0;
 }
