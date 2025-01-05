@@ -17,8 +17,7 @@ def load_data_from_file(self, fileName):
     return data
 
 class Node:
-    def show_subtree(self):
-        indention = ''
+    def show_subtree(self, indention=''):
         description = ''
         description += str(self)
         if self.link1 is not None and self.link0 is not None:
@@ -68,7 +67,7 @@ class ExternalNode(Node):
         self.parent = parent
         self.weight = weight # 0 dla NYT
         self.value = value # None dla NYT
-        self.number = 0
+        self.number = 0 # 0 dla NYT
     def __str__(self):
         if self.value is None:
             return 'NYT'
@@ -108,7 +107,7 @@ class tree:
         if not first_occurence:
             current_node = leaf
             # tu potem wracamy
-            node_with_biggest_num_in_group = max((node for node in self.nodes if node.weight == current_node.weight and type(node) != RootNode), key=lambda node: node.number, default=None)
+            node_with_biggest_num_in_group = max((node for node in self.nodes if node.weight == current_node.weight and type(node) not in [RootNode, InternalNode]), key=lambda node: node.number, default=None)
             if node_with_biggest_num_in_group and not current_node.number == node_with_biggest_num_in_group.number:
                 swapNodes(node_with_biggest_num_in_group, current_node)
 
@@ -121,24 +120,19 @@ class tree:
             new_symbol_node.number = 1
             new_NYT = ExternalNode(None, 0, None)
             new_NYT.number = 0
-            if type(old_NYT) is not RootNode:
+            if type(old_NYT) is ExternalNode:
                 old_NYT_transformed = InternalNode(new_symbol_node, new_NYT, old_NYT.parent, 1)
                 if old_NYT.parent.link0 == old_NYT:
-                    old_NYT_transformed.parent.link0 = old_NYT_transformed
+                    old_NYT.parent.link0 = old_NYT_transformed
                 elif old_NYT.parent.link1 == old_NYT:
-                    old_NYT_transformed.parent.link1 = old_NYT_transformed # tu do pomyślenia
+                    old_NYT.parent.link1 = old_NYT_transformed
             else:
                 old_NYT_transformed = RootNode(new_symbol_node, new_NYT)
                 old_NYT_transformed.weight = 1
             old_NYT_transformed.number = 2
             new_NYT.parent = old_NYT_transformed
             new_symbol_node.parent = old_NYT_transformed
-            # if type(old_NYT) is not RootNode:
-            #     old_NYT_transformed.link0 = new_symbol_node
-            #     old_NYT_transformed.link1 = new_NYT
-            #     new_NYT.parent = old_NYT_transformed
-            #     new_symbol_node.parent = old_NYT_transformed
-            self.nodes[:] = [node for node in self.nodes if node.number != 0] # usuń stary NYT
+            self.nodes[:] = [node for node in self.nodes if node.weight != 0] # usuń stary NYT
             for node in self.nodes:
                 node.number = node.number + 2
             self.nodes.append(old_NYT_transformed)
@@ -149,13 +143,15 @@ class tree:
         
         while type(current_node) is not RootNode:
             current_node = current_node.parent
-            node_with_biggest_num_in_group = max((node for node in self.nodes if node.weight == current_node.weight and type(node) != RootNode), key=lambda node: node.number, default=None)
+            node_with_biggest_num_in_group = max((node for node in self.nodes if node.weight == current_node.weight and type(node) not in [RootNode, InternalNode]), key=lambda node: node.number, default=None)
             if node_with_biggest_num_in_group and not current_node.number == node_with_biggest_num_in_group.number and type(current_node) is not RootNode:
                 swapNodes(node_with_biggest_num_in_group, current_node)
             current_node.weight = current_node.weight + 1
         self.nodes = sorted(self.nodes, key=lambda node: node.number)
 
-        print(self.nodes[-1].show_subtree())
+        root = self.nodes[-1]
+        tree_str = root.show_subtree()
+        print(tree_str)
     
     
 
