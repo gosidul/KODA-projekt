@@ -1,0 +1,20 @@
+from treeClasses import Tree
+
+
+symbol_tree = Tree()
+symbol_tree.update_tree('A')
+symbol_tree.update_tree('A')
+symbol_tree.update_tree('A')
+symbol_tree.update_tree('B')
+symbol_tree.update_tree('D')
+symbol_tree.update_tree('D')
+symbol_tree.update_tree('H')
+symbol_tree.update_tree('P')
+symbol_tree.update_tree('B')
+symbol_tree.update_tree('A')
+symbol_tree.update_tree('B')
+symbol_tree.update_tree('D')
+symbol_tree.update_tree('U')
+symbol_tree.update_tree('U')
+symbol_tree.update_tree('U')
+symbol_tree.update_tree('H')
