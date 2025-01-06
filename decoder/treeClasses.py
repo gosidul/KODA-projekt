@@ -147,10 +147,6 @@ class Tree:
         self.nodes = sorted(self.nodes, key=lambda node: node.number)
 
         root = self.nodes[-1]
-        tree_str = root.show_subtree()
-        print(tree_str)
-    
-    
-
-        
-
+        # Poniższa zakomentowana część wyświetla drzewa w danej chwili do łatwiejszego debuggowania
+        # tree_str = root.show_subtree() 
+        # print(tree_str)
