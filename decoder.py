@@ -50,7 +50,7 @@ class RootNode(Node):
         self.weight = 0
         self.number = 0
     def __str__(self):
-        return 'Root'
+        return ('Root ' + str(self.weight))
 
     
 
@@ -60,7 +60,7 @@ class InternalNode(RootNode):
         self.parent = parent
         self.weight = weight
     def __str__(self):
-        return 'N'
+        return ('N ' + str(self.weight))
 
 class ExternalNode(Node):
     def __init__(self, parent, weight, value):
@@ -71,7 +71,7 @@ class ExternalNode(Node):
     def __str__(self):
         if self.value is None:
             return 'NYT'
-        return str(self.value)
+        return (str(self.value) +' ' + str(self.weight))
 
 def swapNodes(node1, node2):
     n1 = node1.number
@@ -79,22 +79,34 @@ def swapNodes(node1, node2):
     node2.number = n1
     p1 = node1.parent
     p2 = node2.parent
-
+    p10 = False
+    p11 = False
+    p20 = False
+    p21 = False
     if p1.link0 == node1:
-        p1.link0 = node2
+        p10 = True
     elif p1.link1 == node1:
-        p1.link1 = node2
+        p11 = True
 
     if p2.link0 == node2:
-        p2.link0 = node1
+        p20 = True
     elif p2.link1 == node2:
+        p21 = True
+
+    if p10:
+        p1.link0 = node2
+    elif p11:
+        p1.link1 = node2
+    if p20:
+        p2.link0 = node1
+    elif p21:
         p2.link1 = node1
 
     node1.parent = p2
     node2.parent = p1
 
 
-class tree:
+class Tree:
     def __init__(self):
         root = RootNode(None, None)
         self.nodes = [root]
@@ -107,7 +119,7 @@ class tree:
         if not first_occurence:
             current_node = leaf
             # tu potem wracamy
-            node_with_biggest_num_in_group = max((node for node in self.nodes if node.weight == current_node.weight and type(node) not in [RootNode, InternalNode]), key=lambda node: node.number, default=None)
+            node_with_biggest_num_in_group = max((node for node in self.nodes if node.weight == current_node.weight and type(node) != RootNode and type(current_node) != RootNode and node != current_node.parent), key=lambda node: node.number, default=None)
             if node_with_biggest_num_in_group and not current_node.number == node_with_biggest_num_in_group.number:
                 swapNodes(node_with_biggest_num_in_group, current_node)
 
@@ -143,7 +155,7 @@ class tree:
         
         while type(current_node) is not RootNode:
             current_node = current_node.parent
-            node_with_biggest_num_in_group = max((node for node in self.nodes if node.weight == current_node.weight and type(node) not in [RootNode, InternalNode]), key=lambda node: node.number, default=None)
+            node_with_biggest_num_in_group = max((node for node in self.nodes if node.weight == current_node.weight and type(node) != RootNode and type(current_node) != RootNode  and node != current_node.parent), key=lambda node: node.number, default=None)
             if node_with_biggest_num_in_group and not current_node.number == node_with_biggest_num_in_group.number and type(current_node) is not RootNode:
                 swapNodes(node_with_biggest_num_in_group, current_node)
             current_node.weight = current_node.weight + 1
@@ -157,10 +169,20 @@ class tree:
 
         
 
-symbol_tree = tree()
-symbol_tree.update_tree(62)
-symbol_tree.update_tree(62)
-symbol_tree.update_tree(64)
-symbol_tree.update_tree(64)
-symbol_tree.update_tree(64)
-symbol_tree.update_tree(70)
+symbol_tree = Tree()
+symbol_tree.update_tree('A')
+symbol_tree.update_tree('A')
+symbol_tree.update_tree('A')
+symbol_tree.update_tree('B')
+symbol_tree.update_tree('D')
+symbol_tree.update_tree('D')
+symbol_tree.update_tree('H')
+symbol_tree.update_tree('P')
+symbol_tree.update_tree('B')
+symbol_tree.update_tree('A')
+symbol_tree.update_tree('B')
+symbol_tree.update_tree('D')
+symbol_tree.update_tree('U')
+symbol_tree.update_tree('U')
+symbol_tree.update_tree('U')
+symbol_tree.update_tree('H')
