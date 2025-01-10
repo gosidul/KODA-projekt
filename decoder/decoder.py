@@ -34,13 +34,11 @@ def decode(data):
     i = 0
     symbol_tree = Tree()
     p = ''
-    while i < len(data):
+    while i < len(data) and len(out) < 512 ** 2:
         for node in symbol_tree.nodes:
             if type(node) is RootNode and type(node) is not InternalNode:
                 current_node = node
                 break
-        if p == 'D':
-            pass # miejsce na płapkę
         while(type(current_node) is not ExternalNode and current_node is not None):
             bit = data[i]
             i += 1
@@ -49,8 +47,7 @@ def decode(data):
             elif bit == 1:
                 current_node = current_node.link1
         if (type(current_node) is RootNode and current_node.link0 is None and current_node.link1 is None) or (type(current_node) is ExternalNode and current_node.value is None) or current_node is None: # jeśli NYT
-            p = chr(bin_data_to_int(data[i : i + e]))
-            # w ogólnym przypadku tu powinien być dodatkowy warunek ale on zawsze będzie spełniony bo r = 0
+            p = bin_data_to_int(data[i : i + e])
             i += e
         else:
             p = current_node.value
@@ -61,11 +58,10 @@ def decode(data):
 def write_to_pgm_file(data, fileName):
     side_length = sqrt(len(data))
     pgmHeader = 'P5' + '\n' + str(int(side_length)) + ' ' + str(int(side_length)) + '\n' + str(255) +  '\n'
-    file_content = pgmHeader + ''.join(data)
-
     fout=open(fileName, 'wb')
-    file_content_byte = bytearray(file_content,'utf-8')
-    fout.write(file_content_byte)
+    file_header_byte = bytearray(pgmHeader,'utf-8')
+    fout.write(file_header_byte)
+    fout.write(bytearray(data))
     fout.close()
 
 print('Please enter a valid file name ending with .bin with data to decompress')

@@ -8,11 +8,9 @@
   */
 FILE* openFile()
 {
-    uint8_t filePath[512];
+    char filePath[512];
 
     printf("\nPlease enter valid path to file to compress:\n");
-
-    // strcpy((char *)filePath, "C:\\Users\\Admin\\Desktop\\obrazy_testowe\\charlie_generated.pgm"); //              <--- for debug, clear later: #include <string.h> // For strcpy
 
     if (scanf("%511s", filePath) != 1) { 
         printf("\nError: Invalid input. Please try again.\n");
@@ -32,11 +30,9 @@ FILE* openFile()
 
 FILE* createCompressedFile()
 {
-    uint8_t fileName[256];
+    char fileName[256];
 
     printf("\nPlease enter valid file name for compressed data:\n");
-
-    // strcpy((char*)fileName, "compressed"); //                                              <--- for debug, clear later: #include <string.h> // For strcpy
 
     if (scanf("%250s", fileName) != 1) { 
         printf("\nError reading input.");
@@ -59,7 +55,7 @@ FILE* createCompressedFile()
 
 uint8_t readDataFromFile(records* my)
 {
-    uint8_t headerLine[64];
+    char headerLine[64];
     uint8_t headerLines = 0;
     FILE* file = openFile();
     if (!file) return 1;
@@ -134,10 +130,12 @@ uint8_t writeRemainingBits(dataBuffer* my, FILE* compressedFile)
         bufferSize -= 8;
         bytes++;
     }
+
     if (fwrite(&my->buffer, 1, bytes, compressedFile) != bytes) {
         printf("Error: Cannot write remaining bits to file\n");
         return 1;
     }
+
     if (fclose(compressedFile)) {
         printf("Error: Error during closing file\n");
         return 1;
