@@ -14,9 +14,9 @@ def load_data_from_file(fileName):
             byte_bin_value_str = zeros + byte_bin_value_str
             for bit in byte_bin_value_str:
                 if bit == '0':
-                    data.append(0)
+                    data.append(False)
                 elif bit == '1':
-                    data.append(1)
+                    data.append(True)
                 else:
                     raise TypeError("The file you provided is not of .bin type")
     return data
@@ -24,7 +24,11 @@ def load_data_from_file(fileName):
 def bin_data_to_int(bin):
     number = 0
     power = len(bin) - 1
-    for bit in bin:
+    for bit_bool in bin:
+        if bit_bool:
+            bit = 1
+        else:
+            bit = 0
         number = number + (bit * (2 ** power))
         power = power - 1
     return number
@@ -35,16 +39,13 @@ def decode(data):
     symbol_tree = Tree()
     p = ''
     while i < len(data) and len(out) < 512 ** 2:
-        for node in symbol_tree.nodes:
-            if type(node) is RootNode and type(node) is not InternalNode:
-                current_node = node
-                break
+        current_node = symbol_tree.nodes[-1]
         while(type(current_node) is not ExternalNode and current_node is not None):
             bit = data[i]
             i += 1
-            if bit == 0:
+            if not bit:
                 current_node = current_node.link0
-            elif bit == 1:
+            else:
                 current_node = current_node.link1
         if (type(current_node) is RootNode and current_node.link0 is None and current_node.link1 is None) or (type(current_node) is ExternalNode and current_node.value is None) or current_node is None: # jeśli NYT
             p = bin_data_to_int(data[i : i + e])
@@ -69,7 +70,5 @@ fileNameIN = input()
 print('Please enter a valid file name ending with .pgm to write the decompressed data to')
 fileNameOUT = input()
 raw_data = load_data_from_file(fileNameIN)
-# ponizszy ciag sluzy do testowania. Powinien dac efekt identyczny do operacji w treeTest
-# raw_data = [0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0]
 decoded_data = decode(raw_data)
 write_to_pgm_file(decoded_data, fileNameOUT)
