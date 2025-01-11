@@ -3,6 +3,8 @@ from math import sqrt
 
 def load_data_from_file(fileName):
     data = []
+    if fileName[-4:] != '.bin':
+        raise Exception("This is not a binary file.")
     with open(fileName, mode='rb') as file:
         fileContent = file.read()
         for byte_value in fileContent:
@@ -18,7 +20,7 @@ def load_data_from_file(fileName):
                 elif bit == '1':
                     data.append(True)
                 else:
-                    raise TypeError("The file you provided is not of .bin type")
+                    raise TypeError("Error reading .bin file")
     return data
 
 def bin_data_to_int(bin):
@@ -59,16 +61,16 @@ def decode(data):
 def write_to_pgm_file(data, fileName):
     side_length = sqrt(len(data))
     pgmHeader = 'P5' + '\n' + str(int(side_length)) + ' ' + str(int(side_length)) + '\n' + str(255) +  '\n'
-    fout=open(fileName, 'wb')
+    fout=open((fileName + '.pgm'), 'wb')
     file_header_byte = bytearray(pgmHeader,'utf-8')
     fout.write(file_header_byte)
     fout.write(bytearray(data))
     fout.close()
 
-print('Please enter a valid file name ending with .bin with data to decompress')
+print('Please enter a valid path to file ending with .bin with data to decompress')
 fileNameIN = input()
-print('Please enter a valid file name ending with .pgm to write the decompressed data to')
-fileNameOUT = input()
 raw_data = load_data_from_file(fileNameIN)
+print('Please enter a valid file name (without extention) to write the decompressed data to')
+fileNameOUT = input()
 decoded_data = decode(raw_data)
 write_to_pgm_file(decoded_data, fileNameOUT)
