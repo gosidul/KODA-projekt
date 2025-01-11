@@ -1,5 +1,6 @@
 #include "treeOperations.h"
 #include "fileOperations.h"
+#define MSB_32 0x80000000
 
 /**
  * @brief  Retrieves the next record from the `records` matrix in a sequential manner.
@@ -42,7 +43,7 @@ uint8_t expandTree(handler* my)
 {
     uint16_t currentNumberOfNodes = my->tree.baseNumberOfNodes * my->tree.memoryBlockMultiplier;
     my->tree.memoryBlockMultiplier++;
-    node** newNodes = malloc(my->tree.baseNumberOfNodes * my->tree.memoryBlockMultiplier * sizeof(node*));
+    node** newNodes = (node**)malloc(my->tree.baseNumberOfNodes * my->tree.memoryBlockMultiplier * sizeof(node*));
     if (!newNodes) {
         printf("Failed expanding tree");
         return 1;
@@ -99,27 +100,27 @@ uint8_t expandCache(handler* my)
   */
 void appendPathToFile(handler* my, node* _node)
 {
-    node* node = _node;
     uint32_t bits = 0;
     uint8_t mask = 0;
 
-    while (node->parent) {
-        mask++;
-        if (node == (node->parent)->link1)
-            bits = (bits << 1) + 1;
-        else
-            bits = bits << 1;
-        node = node->parent;
+    // If new symbol append its value to MSB of bits
+    if (_node->positionInTree == my->tree.lastNode) {
+        bits = (my->cache.symbolCache[my->cache.lastCacheEntry].symbolValue) << (32 - BITS_IN_BYTE);
+        mask = BITS_IN_BYTE;
     }
 
-    if (_node->positionInTree == my->tree.lastNode) {
-        bits = (bits << BITS_IN_BYTE) + my->cache.symbolCache[my->cache.lastCacheEntry].symbolValue;
-        mask += BITS_IN_BYTE;
+    while (_node->parent) {
+        mask++;
+        bits >>= 1;
+        if (_node == (_node->parent)->link1)
+            bits += MSB_32;
+        _node = _node->parent;
     }
+
+    bits >>= (32-mask);
 
     if (writeToFile(&my->bitBuffer, my->compressedFile, bits, mask)) printf("ERROR: Cannot write to file!");
 }
-
 /**
  * Allocates and initializes a new `handler` structure, including its internal 
  * components (`records`, `cache`, and `tree`).
@@ -130,7 +131,7 @@ void appendPathToFile(handler* my, node* _node)
  **/
 handler* createHandler() {
     // Dynamically allocate memory for the handler
-    handler* _handler = malloc(sizeof(handler));
+    handler* _handler = (handler*)malloc(sizeof(handler));
     if (!_handler) {
         return NULL; // Handle allocation failure
     }

@@ -110,9 +110,7 @@ class Tree:
 
             current_node.weight += 1
         else: #pierwsze wystąpienie symbolu
-            for node in self.nodes:
-                if node.number == 0:
-                    old_NYT = node
+            old_NYT = self.nodes[0]
             new_symbol_node = ExternalNode(None, 1, new_symbol)
             new_symbol_node.number = 1
             new_NYT = ExternalNode(None, 0, None)
@@ -147,10 +145,6 @@ class Tree:
         self.nodes = sorted(self.nodes, key=lambda node: node.number)
 
         root = self.nodes[-1]
-        tree_str = root.show_subtree()
-        print(tree_str)
-    
-    
-
-        
-
+        # Poniższa zakomentowana część wyświetla drzewa w danej chwili do łatwiejszego debuggowania
+        # tree_str = root.show_subtree() 
+        # print(tree_str)
