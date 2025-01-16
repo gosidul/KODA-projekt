@@ -8,14 +8,16 @@
   */
 FILE* openFile()
 {
-    char filePath[512];
+    uint8_t filePath[512];
 
     printf("\nPlease enter valid path to file to compress:\n");
 
-    if (scanf("%511s", filePath) != 1) { 
-        printf("\nError: Invalid input. Please try again.\n");
-        return NULL;
-    }
+    strcpy((char *)filePath, "C:\\Users\\Admin\\Desktop\\obrazy_testowe\\barbara.pgm");
+
+    // if (scanf("%511s", filePath) != 1) { 
+    //     printf("\nError: Invalid input. Please try again.\n");
+    //     return NULL;
+    // }
 
     // Open file with provided name on binary read mode
     FILE* fileToCompress = fopen(filePath,"rb");
@@ -30,14 +32,16 @@ FILE* openFile()
 
 FILE* createCompressedFile()
 {
-    char fileName[256];
+    uint8_t fileName[256];
 
     printf("\nPlease enter valid file name for compressed data:\n");
 
-    if (scanf("%250s", fileName) != 1) { 
-        printf("\nError reading input.");
-        return NULL;
-    }
+    strcpy((char*)fileName, "compressed");
+
+    // if (scanf("%250s", fileName) != 1) { 
+    //     printf("\nError reading input.");
+    //     return NULL;
+    // }
 
     // Append ".bin" extension to the provided file name
     snprintf(fileName, sizeof(fileName), "%s.bin", fileName);
@@ -55,7 +59,7 @@ FILE* createCompressedFile()
 
 uint8_t readDataFromFile(records* my)
 {
-    char headerLine[64];
+    uint8_t headerLine[64];
     uint8_t headerLines = 0;
     FILE* file = openFile();
     if (!file) return 1;

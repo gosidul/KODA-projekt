@@ -56,7 +56,7 @@ class ExternalNode(Node):
     def __str__(self):
         if self.value is None:
             return 'NYT'
-        return (str(self.value) +' ' + str(self.weight))
+        return (chr(self.value) +' ' + str(self.weight))
 
 def swapNodes(node1, node2):
     n1 = node1.number
