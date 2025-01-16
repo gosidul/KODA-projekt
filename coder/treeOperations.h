@@ -3,6 +3,7 @@
 
 #define BASE_NODES_ENTRIES 32
 #define BASE_CACHE_ENTRIES 16
+#define BASE_ARRAY_ENTRIES 8
 #define BITS_IN_BYTE 8
 
 #include <stdio.h>
@@ -46,6 +47,7 @@ typedef struct node {
  */
 typedef struct tree {
     struct node** nodes;
+    struct node** memoryPointers;
     uint8_t baseNumberOfNodes;
     uint8_t memoryBlockMultiplier;
     uint16_t lastNode;
@@ -100,8 +102,8 @@ typedef struct records {
  * @tree: A `tree` structure representing the Huffman tree for encoding and decoding.
  */
 typedef struct handler {
-    dataBuffer bitBuffer;
     FILE* compressedFile;
+    dataBuffer bitBuffer;
     records records;
     cache  cache;
     tree tree;
@@ -131,4 +133,12 @@ uint8_t initialize(handler* my);
   */
 uint8_t constructTree(handler* my);
 
-#endif // TREE_OPERATIONS
+/**
+  * @brief  Frees memory used by structs
+  * @param  my pointer to handler struct containing instances of: dataBuffer, records, cache, tree
+  *         and compressedFile pointer
+  * @retval None
+  */
+void freeAlocatedMemory(handler* my);
+
+#endif // TREE_OPERATIONS_H

@@ -1,5 +1,6 @@
 #include "treeOperations.h"
 #include "fileOperations.h"
+
 #define MSB_32 0x80000000
 
 /**
@@ -32,6 +33,21 @@ uint8_t popRecord(records* my)
     return record;
 }
 
+uint8_t expandPointersArray(handler* my)
+{
+    node** newArray = (node**)malloc((my->tree.memoryBlockMultiplier + BASE_ARRAY_ENTRIES) * sizeof(node*));
+    if (!newArray) {
+        printf("Failed expanding array pointers array");
+        return 1;
+    }
+    if (my->tree.memoryPointers) {
+        memcpy(newArray, my->tree.memoryPointers, my->tree.memoryBlockMultiplier * sizeof(node*));
+        free(my->tree.memoryPointers);
+    }
+    my->tree.memoryPointers = newArray;
+    return 0;
+}
+
 /**
  * @brief  Expands the tree by reallocating memory for the array of node pointers and adding a new block of nodes.
  *         It calculates the current tree size, allocates memory for the expanded tree, and copies the existing node 
@@ -41,9 +57,12 @@ uint8_t popRecord(records* my)
  */
 uint8_t expandTree(handler* my)
 {
-    uint16_t currentNumberOfNodes = my->tree.baseNumberOfNodes * my->tree.memoryBlockMultiplier;
-    my->tree.memoryBlockMultiplier++;
-    node** newNodes = (node**)malloc(my->tree.baseNumberOfNodes * my->tree.memoryBlockMultiplier * sizeof(node*));
+    // Expand array of pointers if necesarry 
+    if (my->tree.memoryBlockMultiplier % BASE_ARRAY_ENTRIES == 0) 
+        if (expandPointersArray(my)) return 1;
+
+    uint16_t  currentNumberOfNodes = my->tree.baseNumberOfNodes * my->tree.memoryBlockMultiplier;
+    node** newNodes = (node**)malloc(my->tree.baseNumberOfNodes * (my->tree.memoryBlockMultiplier + 1) * sizeof(node*));
     if (!newNodes) {
         printf("Failed expanding tree");
         return 1;
@@ -54,13 +73,18 @@ uint8_t expandTree(handler* my)
         printf("Failed expanding tree");
         return 1;
     }
+
+    // Append address of new memory chunk to pointers array for memory tracking
+    my->tree.memoryPointers[my->tree.memoryBlockMultiplier] = *(newNodes + currentNumberOfNodes);
+
     for (uint16_t i = 1; i < my->tree.baseNumberOfNodes; i++)
-        *(newNodes + currentNumberOfNodes + i) = *(newNodes + currentNumberOfNodes) + i;
+        *(newNodes + currentNumberOfNodes + i) = newNodes[currentNumberOfNodes] + i; // node* -> &node[0]
     if (my->tree.nodes) {
         memcpy(newNodes, my->tree.nodes, currentNumberOfNodes * sizeof(node*));
         free(my->tree.nodes);
     }
     my->tree.nodes = newNodes;
+    my->tree.memoryBlockMultiplier++;
     return 0;
 }
 
@@ -85,6 +109,23 @@ uint8_t expandCache(handler* my)
     }
     my->cache.symbolCache = tempCache;
     return 0;
+}
+
+void freeAlocatedMemory(handler* my)
+{
+    // Free memory used for symbolCache array
+    if (my->cache.symbolCache) {
+        free(my->cache.symbolCache);
+        my->cache.symbolCache = NULL;
+    }
+    // Free memory used for nodes array
+    if (my->tree.nodes) {
+        for (uint16_t i = 0; i < my->tree.memoryBlockMultiplier; i++)
+            free(my->tree.memoryPointers[i]);
+        // Free memory for node struct pointers
+        free(my->tree.nodes);
+        my->tree.nodes = NULL;
+    }
 }
 
 /**
@@ -117,10 +158,11 @@ void appendPathToFile(handler* my, node* _node)
         _node = _node->parent;
     }
 
-    bits >>= (32-mask);
+    bits >>= (32-mask); // 32 -> bits in "bits" variable (uint32_t)
 
     if (writeToFile(&my->bitBuffer, my->compressedFile, bits, mask)) printf("ERROR: Cannot write to file!");
 }
+
 /**
  * Allocates and initializes a new `handler` structure, including its internal 
  * components (`records`, `cache`, and `tree`).
@@ -131,7 +173,7 @@ void appendPathToFile(handler* my, node* _node)
  **/
 handler* createHandler() {
     // Dynamically allocate memory for the handler
-    handler* _handler = (handler*)malloc(sizeof(handler));
+    handler* _handler = malloc(sizeof(handler));
     if (!_handler) {
         return NULL; // Handle allocation failure
     }
@@ -155,6 +197,7 @@ handler* createHandler() {
     _handler->cache.lastCacheEntry = 0;
 
     _handler->tree.nodes = NULL;
+    _handler->tree.memoryPointers = NULL;
     _handler->tree.baseNumberOfNodes = BASE_NODES_ENTRIES;
     _handler->tree.memoryBlockMultiplier = 0;
     _handler->tree.lastNode = 0;
@@ -176,6 +219,7 @@ uint8_t initialize(handler* my)
     // Allocate memory for struct fields
     if (expandTree(my)) return 1;
     if (expandCache(my)) return 1;
+    if (expandPointersArray(my)) return 1;
 
     // Allocate memory for records matrix and populate it with data
     if (readDataFromFile(&my->records)) return 1;
