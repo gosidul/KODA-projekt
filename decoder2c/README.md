@@ -1,0 +1,4 @@
+## Sposób uruchamiania
+Projekt składa się z kodera (w języku C) i dwóch dekoderów (jeden w języku C i drugi w pythonie). Aby korzystać z kodera i dekodera napisanych w C należy skorzystać z zamieszczonych plików .exe lub samodzielnie skompilować programy za pomocą kompilatora g++ lub gcc. Do uruchomienia kodu pythonowego po zainstalowaniu samego pythona wystarczy przejście do folderu `decoder` w drzewie projektu oraz wpisanie komendy w konsoli:  
+`python3 decoder.py`  
+Po uruchomieniu każdego z programów w terminalu pojawi się prośba o podanie preferowanej nazwy pliku z danymi wyjściowymi oraz ścieżki do pliku z danymi wyjściowymi.

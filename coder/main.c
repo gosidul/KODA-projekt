@@ -1,18 +1,19 @@
-#include "treeOperations.h"
 #include "fileOperations.h"
-#include "time.h"
 
-int main()
+uint8_t run()
 {
-    clock_t start = clock();
-
     handler* handler = createHandler();
     if (!handler) return 1;
     if (initialize(handler)) return 1;
     if (constructTree(handler)) return 1;
     freeAlocatedMemory(handler);
+    scanf("%d", NULL);
+    return 0;
+}
 
-    printf("Execute time: %dms\n", clock() - start);
-
+int main()
+{
+    run();
+    scanf("%d", NULL);
     return 0;
 }

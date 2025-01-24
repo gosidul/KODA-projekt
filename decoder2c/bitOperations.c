@@ -252,6 +252,12 @@ uint8_t writeToFile(byteBuffer* this)
         printf("Błąd podczas tworzenia pliku!\n");
         return 1;
     }
+
+    fprintf(newFile, "P5\n");
+    fprintf(newFile, "# Created by IrfanView\n");
+    fprintf(newFile, "512 512\n");
+    fprintf(newFile, "255\n");
+
     if (fwrite(this->baseBuffer->dataBuffer, 1, this->currentByte, newFile) != this->currentByte) {
         printf("Błąd podczas zapisywania danych do pliku!\n");
         return 1;
